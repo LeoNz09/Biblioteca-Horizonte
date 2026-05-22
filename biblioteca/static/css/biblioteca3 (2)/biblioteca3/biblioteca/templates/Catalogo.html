@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Catálogo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body>
+
+<h1>Catálogo de Libros</h1>
+
+<table border="1">
+    <tr>
+        <th>ID</th>
+        <th>Título</th>
+        <th>Disponibles</th>
+        <th>Total</th>
+    </tr>
+
+    {% for libro in libros %}
+    <tr>
+        <td>{{ libro.id_libro }}</td>
+        <td>{{ libro.titulo }}</td>
+        <td>{{ libro.disponibles }}</td>
+        <td>{{ libro.cantidad }}</td>
+    </tr>
+    {% endfor %}
+
+</table>
+
+<a href="/">Volver</a>
+
+</body>
+</html>

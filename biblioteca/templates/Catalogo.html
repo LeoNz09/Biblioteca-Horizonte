@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Catálogo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body>
+<div class="navbar">
+
+    <a href="/">Inicio</a>
+
+    <a href="/buscar">Buscar</a>
+
+    <a href="/prestamos">Préstamos</a>
+
+    <a href="/devoluciones">Devoluciones</a>
+
+    {% if session.get('rol') == 'administrador' %}
+        <a href="/historial">Historial</a>
+    {% endif %}
+
+</div>
+<div class="contenedor">
+<h1>Catálogo de Libros</h1>
+
+<table border="1">
+    <tr>
+        <th>ID</th>
+        <th>Título</th>
+        <th>Disponibles</th>
+        <th>Total</th>
+    </tr>
+
+    {% for libro in libros %}
+    <tr>
+        <td>{{ libro.id_libro }}</td>
+        <td>{{ libro.titulo }}</td>
+        <td>{{ libro.disponibles }}</td>
+        <td>{{ libro.cantidad }}</td>
+    </tr>
+    {% endfor %}
+
+</table>
+
+<a href="/">Volver</a>
+</div>
+</body>
+</html>
