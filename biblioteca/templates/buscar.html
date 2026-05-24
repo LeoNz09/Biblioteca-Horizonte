@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Buscar Libros</title>
+
+    <link rel="stylesheet"
+    href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+
+<body>
+<div class="navbar">
+
+    <a href="/">Inicio</a>
+
+    <a href="/catalogo">Catálogo</a>
+
+
+    <a href="/prestamos">Préstamos</a>
+
+    <a href="/devoluciones">Devoluciones</a>
+
+    {% if session.get('rol') == 'administrador' %}
+        <a href="/historial">Historial</a>
+    {% endif %}
+
+</div>
+<div class="contenedor">
+
+    <h1>Buscar Libros</h1>
+
+    <form method="POST">
+
+        <input
+        type="text"
+        name="texto"
+        placeholder="Escribe un título">
+
+        <button type="submit">
+            Buscar
+        </button>
+
+    </form>
+
+    <br>
+
+    <table>
+
+        <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Autor</th>
+            <th>Detalles</th>
+        </tr>
+
+        {% for libro in libros %}
+
+        <tr>
+
+            <td>{{ libro.id_libro }}</td>
+
+            <td>{{ libro.titulo }}</td>
+
+            <td>{{ libro.autor }}</td>
+
+            <td>
+
+                <a href="/detalle/{{ libro.id_libro }}">
+                    Ver Detalles
+                </a>
+
+            </td>
+
+        </tr>
+
+        {% endfor %}
+
+    </table>
+
+    <br><br>
+
+    <a href="/">⬅ Volver</a>
+
+</div>
+
+</body>
+</html>

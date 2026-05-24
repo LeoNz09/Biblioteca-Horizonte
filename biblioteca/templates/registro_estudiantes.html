@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Registro de Estudiantes</title>
+
+    <link rel="stylesheet"
+    href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+
+<body>
+
+<div class="navbar">
+
+    <a href="/">Inicio</a>
+
+    <a href="/catalogo">Catalogo</a>
+
+    <a href="/buscar">Buscar</a>
+
+    <a href="/devoluciones">Devoluciones</a>
+
+    {% if session.get('rol') == 'administrador' %}
+        <a href="/historial">Historial</a>
+        <a href="/baja">Baja</a>
+        <a href="/registro">Registro</a>
+        <a href="/registro_estudiantes">Estudiantes</a>
+    {% endif %}
+
+</div>
+
+<div class="contenedor">
+
+    <h1>Registro de Estudiantes</h1>
+
+    <h2>Ingresa los datos del estudiante</h2>
+
+    <form action="/registro_estudiantes" method="POST">
+
+        <label for="nombre">
+            Nombre:
+        </label>
+
+        <input
+            type="text"
+            id="nombre"
+            name="nombre"
+            required
+        >
+
+        <br><br>
+
+        <label for="apellidos">
+            Apellidos:
+        </label>
+
+        <input
+            type="text"
+            id="apellidos"
+            name="apellidos"
+            required
+        >
+
+        <br><br>
+
+        <label for="matricula">
+            Matricula:
+        </label>
+
+        <input
+            type="text"
+            id="matricula"
+            name="matricula"
+            required
+        >
+
+        <br><br>
+
+        <label for="carrera">
+            Carrera:
+        </label>
+
+        <input
+            type="text"
+            id="carrera"
+            name="carrera"
+            required
+        >
+
+        <br><br>
+
+        <button
+            type="submit"
+            style="
+                background-color: #18b0a9;
+                color: white;
+                padding: 12px 20px;
+                border: none;
+                cursor: pointer;
+                font-weight: bold;
+            "
+        >
+            Registrar estudiante
+        </button>
+
+    </form>
+
+    {% if estado %}
+
+        {% if estado == 'exito' %}
+
+            <p class="mensaje-exito">
+                Estudiante registrado correctamente
+            </p>
+
+        {% elif estado == 'matricula_repetida' %}
+
+            <p class="mensaje-error">
+                La matricula ya existe
+            </p>
+
+        {% elif estado == 'error_db' %}
+
+            <p class="mensaje-error">
+                Error interno en la base de datos
+            </p>
+
+        {% endif %}
+
+    {% endif %}
+
+    <br><br>
+
+    <a href="/">
+        Volver al inicio
+    </a>
+
+</div>
+
+</body>
+</html>

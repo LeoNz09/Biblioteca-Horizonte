@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio - Biblio Horizonte</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body>
+
+<div class="contenedor">
+    <h1>Sistema Bibliotecario Horizonte</h1>
+    
+    <div style="text-align: center; margin-top: 30px;">
+        
+        {% if session['rol'] == 'administrador' %}
+            <h2>Panel de Administración</h2>
+            <p>Bienvenido, <strong>{{ session['nombre'] }}</strong>. Gestiona los módulos internos de la librería:</p>
+            <br>
+            
+            <a href="/catalogo"><button type="button">Ver Catálogo</button></a>
+            <a href="/historial"><button type="button">Ver Historial de Préstamos</button></a>
+            <a href="/registro"><button type="button" style="background-color: #10b981;">Registrar Nuevo Libro</button></a>
+            
+            <br><br><br>
+            <a href="/logout" style="color: #ef4444; font-weight: bold; text-decoration: none;">🔒 Salir del Modo Administrador</a>
+
+        {% else %}
+            <h2>Portal de Lectores</h2>
+            <p>Selecciona una de las siguientes opciones para gestionar tus solicitudes:</p>
+            <br>
+            
+            <a href="/catalogo"><button type="button">Ver Catálogo</button></a>
+            <a href="/prestamos"><button type="button">Solicitar Préstamo</button></a>
+            <a href="/devoluciones"><button type="button">Registrar Devolución</button></a>
+            
+            <br><br><br>
+            <hr style="border: 1px solid #e5e7eb; width: 80%; margin: 0 auto;">
+            <br>
+            
+            <p style="font-size: 14px; color: #6b7280; margin-bottom: 10px;">¿Eres parte del personal administrativo?</p>
+            <a href="/login"><button type="button" style="background-color: #4b5563; font-size: 14px; padding: 8px 16px;">🔑 Login Administrador</button></a>
+        {% endif %}
+
+    </div>
+</div>
+
+</body>
+</html>
