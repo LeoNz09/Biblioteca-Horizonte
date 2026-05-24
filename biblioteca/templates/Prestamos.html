@@ -1,87 +1,229 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Prestamos</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Préstamos</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+
+<style>
+
+table{
+    width:100%;
+    border-collapse: collapse;
+    margin-top:30px;
+}
+
+th, td{
+    border:1px solid #ccc;
+    padding:12px;
+    text-align:left;
+}
+
+th{
+    background:#2c3e50;
+    color:white;
+}
+
+tr:nth-child(even){
+    background:#f2f2f2;
+}
+
+/* filas seleccionables */
+.fila-libro{
+    cursor:pointer;
+    transition:0.2s;
+}
+
+.fila-libro:hover{
+    background:#dbeafe;
+}
+
+.fila-seleccionada{
+    background:#93c5fd !important;
+}
+
+/* inputs */
+input[type="text"]{
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    border:2px solid #93c5fd;
+    margin-top:10px;
+}
+
+/* botones */
+button{
+    margin-top:20px;
+    padding:12px 25px;
+    border:none;
+    border-radius:10px;
+    background:#3b82f6;
+    color:white;
+    font-size:18px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#2563eb;
+}
+
+/* alertas */
+.mensaje-exito{
+    margin-top:30px;
+    padding:20px;
+    background:#d4edda;
+    border:1px solid #28a745;
+    border-radius:10px;
+    color:#155724;
+}
+
+.mensaje-error{
+    margin-top:20px;
+    padding:15px;
+    background:#f8d7da;
+    border:1px solid #dc3545;
+    border-radius:10px;
+    color:#721c24;
+}
+
+</style>
+
 </head>
+
 <body>
+
+<!-- NAVBAR -->
 <div class="navbar">
-
     <a href="/">Inicio</a>
-
     <a href="/catalogo">Catálogo</a>
-
     <a href="/buscar">Buscar</a>
-
     <a href="/devoluciones">Devoluciones</a>
+</div>
 
-    {% if session.get('rol') == 'administrador' %}
-        <a href="/historial">Historial</a>
+<div class="contenedor">
+
+<h1>Préstamo de libros</h1>
+
+<!-- =========================
+PASO 1: MATRICULA
+========================= -->
+<h2>1. Ingresa la matrícula</h2>
+
+<form method="POST">
+
+    <input type="hidden" name="accion" value="validar">
+
+    <label>Matrícula del estudiante:</label>
+    <input type="text" name="matricula" value="{{ matricula }}" required>
+
+    <!-- =========================
+    ÉXITO
+    ========================= -->
+    {% if estado == 'prestado_con_exito' %}
+    <div class="mensaje-exito">
+
+        <h3>Préstamo realizado correctamente:</h3>
+
+        <ul>
+            {% for libro in libros_prestados %}
+                <li>{{ libro }}</li>
+            {% endfor %}
+        </ul>
+
+    </div>
     {% endif %}
 
+    <button type="submit">Buscar estudiante</button>
+
+</form>
+
+<!-- ERROR -->
+{% if estado == 'estudiante_no_existe' %}
+<div class="mensaje-error">
+     La matrícula no existe en el sistema.
 </div>
-    <div class="contenedor">
-    <h1>Prestamo de libros</h1>
+{% endif %}
 
-    <h2>Por favor ingresa los datos para realizar el préstamo de tu libro:</h2>
-
-    <form action="/prestamos" method="POST">
-        <input type="hidden" name="accion" value="buscar">
-        
-        <label for="titulo">Nombre del libro:</label>
-        <input type="text" id="titulo" name="titulo" value="{{ titulo_buscado if titulo_buscado else '' }}" required>
-        <br><br>
-
-        <label for="matricula">Matricula del estudiante:</label>
-        <input type="text" id="matricula" name="matricula" value="{{ matricula_buscada if matricula_buscada else ''}}" required>
-        <br><br>
-
-        <button type="submit">Buscar</button>
-    </form>
-
-    {% if estado %}
-        
-        {% if estado == 'no_existe' %}
-            <p class="mensaje-error">El libro no existe en la base de datos.</p>
-        
-        {% elif estado == 'no_disponible' %}
-            <p class="mensaje-error">El libro existe, pero no esta disponible actualmente (copias agotadas).</p>
-        
-        {% elif estado == 'estudiante_no_existe' %}
-            <p class="mensaje-error">La matricula ingresada no existe</p>
-        
-        {% elif estado == 'existe' %}
-            <div class="bloque-resultado">
-                <p>¡Libro encontrado! Hay copias disponibles.</p>
-
-                <form action="/prestamos" method="POST">
-                    <input type="hidden" name="accion" value="solicitar">
-                    <input type="hidden" name="titulo" value="{{ titulo_buscado }}">
-                    <input type="hidden" name="matricula" value="{{ matricula_buscada }}">
-                    
-                    <label for="nombre_prestamista">Nombre de quien solicita el préstamo:</label>
-                    <input type="text" id="nombre_prestamista" name="nombre_prestamista" value="{{ nombre_estudiante }}">
-                    <br><br>
-                    
-                    <button type="submit" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer;">
-                        Confirmar préstamo
-                    </button>
-                </form>
-            </div>
-
-        {% elif estado == 'prestado_con_exito' %}
-            <p class="mensaje-exito">¡Prestamo realizado con exito!</p>
-            
-        {% elif estado == 'error_db' %}
-            <p class="mensaje-error">Hubo un problema al procesar el prestamo en la base de datos.</p>
-        {% endif %}
-
-    {% endif %}
-
-    <br><br>
-    <a href="/">Volver al inicio</a>
+{% if estado == 'no_disponible' %}
+<div class="mensaje-error">
+     Debes seleccionar al menos un libro.
 </div>
+{% endif %}
+
+<!-- =========================
+PASO 2: CATALOGO
+========================= -->
+{% if estudiante_valido %}
+
+<h2>2. Selecciona libros disponibles</h2>
+
+<form method="POST">
+
+    <input type="hidden" name="accion" value="solicitar">
+    <input type="hidden" name="matricula" value="{{ matricula }}">
+
+    <table>
+
+        <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Autor</th>
+            <th>Categoría</th>
+            <th>Descripción</th>
+        </tr>
+
+        {% for libro in libros_catalogo %}
+
+        <tr class="fila-libro">
+
+            <td style="display:none;">
+                <input type="checkbox" name="libros" value="{{ libro.id_libro }}">
+            </td>
+
+            <td>{{ libro.id_libro }}</td>
+            <td>{{ libro.titulo }}</td>
+            <td>{{ libro.autor }}</td>
+            <td>{{ libro.categoria }}</td>
+            <td>{{ libro.descripcion }}</td>
+
+        </tr>
+
+        {% endfor %}
+
+    </table>
+
+    <button type="submit">Confirmar préstamo</button>
+
+</form>
+
+{% endif %}
+
+
+
+</div>
+
+
+<script>
+
+document.querySelectorAll('.fila-libro').forEach(fila => {
+
+    fila.addEventListener('click', () => {
+
+        const checkbox = fila.querySelector('input');
+
+        checkbox.checked = !checkbox.checked;
+
+        fila.classList.toggle('fila-seleccionada');
+
+    });
+
+});
+
+</script>
+
 </body>
 </html>

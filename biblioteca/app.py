@@ -86,169 +86,266 @@ def catalogo():
 def prestamos():
 
     estado = None
-    titulo_buscado = None
-    matricula_buscada = None
-    nombre_estudiante = None
+    libros_prestados = []
+    libros_catalogo = []
+    estudiante_valido = False
+    matricula = ""
 
+    conexion = obtener_conexion()
+    cursor = conexion.cursor(dictionary=True)
+
+    # =========================
+    # POST
+    # =========================
     if request.method == 'POST':
-        accion = request.form.get('accion')     #boton de accion de buscar
-        titulo_ingresado = request.form.get('titulo').strip()   # Limpiar espacios en blanco
-        titulo_buscado = titulo_ingresado   #Mantener el texto
 
-        # Abrir conexion con el servidor MySQL
-        conexion = obtener_conexion()
-        cursor = conexion.cursor(dictionary=True)
+        accion = request.form.get('accion')
+        matricula = request.form.get('matricula', '').strip()
 
-        # Consultar el libro
-        query_buscar = "SELECT id_libro, disponibles FROM libros WHERE titulo = %s"
-        cursor.execute(query_buscar, (titulo_ingresado,))
-        libro = cursor.fetchone()   # Devuelve el registro encontrado
+        # =========================
+        # VALIDAR ESTUDIANTE
+        # =========================
+        cursor.execute("""
+            SELECT nombre, apellidos
+            FROM estudiantes
+            WHERE matricula = %s
+        """, (matricula,))
 
-        # BUSCAR LIBRO
-        if accion == 'buscar':
-            matricula_ingresada = request.form.get('matricula', '').strip()
-            matricula_buscada = matricula_ingresada
+        estudiante = cursor.fetchone()
 
-            if not libro:
-                estado = 'no_existe'        # El libro no existe en la base de datos
-            elif libro['disponibles'] <= 0:
-                estado = 'no_disponible'    # El libro existe pero no hay copias disponibles
-            else:
-                query_buscar_estudiante = "SELECT nombre, apellidos FROM estudiantes WHERE matricula = %s"
-                cursor.execute(query_buscar_estudiante, (matricula_ingresada,))
-                estudiante = cursor.fetchone()
+        if not estudiante:
+            estado = 'estudiante_no_existe'
+            estudiante_valido = False
 
-                if not estudiante:
-                    estado = 'estudiante_no_existe' # La matrícula no existe
+        else:
+            estudiante_valido = True
+
+            nombre_completo = estudiante['nombre'] + " " + estudiante['apellidos']
+
+            # =========================
+            # CATALOGO FILTRADO
+            # =========================
+            cursor.execute("""
+                SELECT id_libro, titulo, autor, categoria, descripcion, disponibles
+                FROM libros l
+                WHERE l.disponibles > 0
+                AND l.titulo NOT IN (
+                    SELECT p.titulo_libro
+                    FROM prestamo p
+                    WHERE p.matricula = %s
+                )
+            """, (matricula,))
+
+            libros_catalogo = cursor.fetchall()
+
+            # =========================
+            # PRESTAMO
+            # =========================
+            if accion == 'solicitar':
+
+                libros_ids = request.form.getlist('libros')
+
+                if len(libros_ids) == 0:
+                    estado = 'no_disponible'
+
                 else:
-                    estado = 'existe' # El libro y la matricula existe
-                    nombre_estudiante = f"{estudiante['nombre']} {estudiante['apellidos']}"
 
-        # CONFIRMAR Y SOLICITAR PRESTAMO
-        elif accion == 'solicitar':
-            matricula_confirmada = request.form.get('matricula').strip()
-            nombre_prestamista = request.form.get('nombre_prestamista', '').strip()
+                    try:
 
-            # Validacion del libro, matricula y nombre
-            if libro and libro['disponibles'] > 0 and matricula_confirmada and nombre_prestamista:
+                        for libro_id in libros_ids:
 
-                try:
-                    # Disminuir el stock para el libro prestado
-                    nueva_cantidad = libro['disponibles'] - 1
-                    query_actualizar = "UPDATE libros SET disponibles = %s WHERE id_libro = %s"
-                    cursor.execute(query_actualizar, (nueva_cantidad, libro['id_libro']))
+                            # obtener libro
+                            cursor.execute("""
+                                SELECT id_libro, titulo, disponibles
+                                FROM libros
+                                WHERE id_libro = %s
+                            """, (libro_id,))
 
-                    # REGISTRAR EL PRESTAMO EN LA TABLA PRESTAMO
-                    query_insertar = "INSERT INTO prestamo (matricula, titulo_libro, nombre_prestamista) VALUES (%s, %s, %s)"
-                    cursor.execute(query_insertar, (matricula_confirmada, titulo_ingresado, nombre_prestamista))
+                            libro = cursor.fetchone()
 
-                    # Confirmar operaciones en la base de datos
-                    conexion.commit()
-                    estado = 'prestado_con_exito'
+                            if not libro:
+                                continue
 
-                except mysql.connector.Error as err:
-                    print(f"Error en la transaccion: {err}")
-                    conexion.rollback()     # Cancela el prestamo si algo falla
-                    estado = 'error_db'
-            else:
-                estado = 'no_disponible'
+                            # validar disponibilidad
+                            if libro['disponibles'] <= 0:
+                                continue
 
-        # Cerrar flujos abiertos
-        cursor.close()
-        conexion.close()
+                            # validar duplicado
+                            cursor.execute("""
+                                SELECT id_prestamo
+                                FROM prestamo
+                                WHERE matricula = %s AND titulo_libro = %s
+                            """, (matricula, libro['titulo']))
 
-    return render_template('Prestamos.html', estado=estado, titulo_buscado=titulo_buscado, matricula_buscada=matricula_buscada, nombre_estudiante=nombre_estudiante)
+                            ya_prestado = cursor.fetchone()
 
-# MODULO PARA DEVOLUCIONES
+                            if ya_prestado:
+                                continue
+
+                            # actualizar stock
+                            cursor.execute("""
+                                UPDATE libros
+                                SET disponibles = disponibles - 1
+                                WHERE id_libro = %s
+                            """, (libro_id,))
+
+                            # insertar prestamo
+                            cursor.execute("""
+                                INSERT INTO prestamo
+                                (matricula, titulo_libro, nombre_prestamista)
+                                VALUES (%s, %s, %s)
+                            """, (
+                                matricula,
+                                libro['titulo'],
+                                nombre_completo
+                            ))
+
+                            libros_prestados.append(libro['titulo'])
+
+                        conexion.commit()
+                        estado = 'prestado_con_exito'
+
+                    except mysql.connector.Error as err:
+                        print(err)
+                        conexion.rollback()
+                        estado = 'error_db'
+
+    cursor.close()
+    conexion.close()
+
+    return render_template(
+        'Prestamos.html',
+        estado=estado,
+        libros_catalogo=libros_catalogo,
+        libros_prestados=libros_prestados,
+        estudiante_valido=estudiante_valido,
+        matricula=matricula
+    )
+##DEVOLUCIONESSS
 @app.route('/devoluciones', methods=['GET', 'POST'])
 def devoluciones():
+
     estado = None
-    titulo_buscado = None
-    matricula_buscada = None
-    nombre_estudiante = None
-    
+    matricula = ""
+    libros_usuario = []
+    libros_devueltos = []
+    libros_invalidos = []
+
+    conexion = obtener_conexion()
+    cursor = conexion.cursor(dictionary=True)
+
     if request.method == 'POST':
-        accion = request.form.get('accion') # botón de buscar o devolver
-        titulo_ingresado = request.form.get('titulo').strip()   #limpiar espacios en blanco
-        titulo_buscado = titulo_ingresado # Mantiene el texto en la caja de búsqueda
-        
-        # Abrir conexion con el servidor MySQL
-        conexion = obtener_conexion()
-        cursor = conexion.cursor(dictionary=True)
-        
-        # Buscar el libro en la base de datos y ver el stock del libro
-        query_buscar = "SELECT id_libro, disponibles, cantidad FROM libros WHERE titulo = %s"
-        cursor.execute(query_buscar, (titulo_ingresado,))
-        libro = cursor.fetchone()   # Devuelve el registro encontrado
 
-        # Buscar libro y validar el prestamo y la matricula
-        if accion == 'buscar':
-            matricula_ingresada = request.form.get('matricula', '').strip()
-            matricula_buscada = matricula_ingresada
+        accion = request.form.get('accion')
+        matricula = request.form.get('matricula', '').strip()
 
-            if not libro:
-                estado = 'no_existe'    # El libro no existe
-            elif libro['disponibles'] >= libro['cantidad']:
-                estado = 'completo'     # El libro existe pero ya están todas las copias
-            else:
-                # El libro existe y hay copia disponibles
-                query_validar_prestamo = "SELECT id_prestamo, nombre_prestamista FROM prestamo WHERE titulo_libro = %s AND matricula = %s LIMIT 1"
-                cursor.execute(query_validar_prestamo, (titulo_ingresado, matricula_ingresada))
-                prestamo_activo = cursor.fetchone()
+        # =========================
+        # VALIDAR SI EXISTE USUARIO
+        # =========================
+        cursor.execute("""
+            SELECT DISTINCT matricula
+            FROM prestamo
+            WHERE matricula = %s
+        """, (matricula,))
 
-                if not prestamo_activo:
-                    estado = 'usuario_incorrecto'
+        usuario = cursor.fetchone()
+
+        if not usuario:
+            estado = 'usuario_no_existe'
+
+        else:
+
+            # =========================
+            # PASO 1: BUSCAR LIBROS
+            # =========================
+            if accion == 'buscar':
+
+                cursor.execute("""
+                    SELECT id_prestamo, titulo_libro
+                    FROM prestamo
+                    WHERE matricula = %s
+                """, (matricula,))
+
+                libros_usuario = cursor.fetchall()
+
+                if not libros_usuario:
+                    estado = 'sin_prestamos'
                 else:
-                    estado = 'apto'         # Hay un prestamo activo
-                    nombre_estudiante = prestamo_activo['nombre_prestamista']
+                    estado = 'mostrar_libros'
 
-        # VALIDAR USUARIO Y CONFIRMAR LA DEVOLUCIÓN        
-        elif accion == 'devolver':
-            matricula_confirmada = request.form.get('matricula').strip()
-            nombre_prestamista = request.form.get('nombre_prestamista').strip()
-            
-            # Validar que faltan copias del libro
-            if libro and libro['disponibles'] < libro['cantidad']:
-                
-                # Validar que el usuario tenga un libro pendiente por devolver
-                query_buscar_id = "SELECT id_prestamo FROM prestamo WHERE titulo_libro = %s AND matricula = %s LIMIT 1"
-                cursor.execute(query_buscar_id, (titulo_ingresado, matricula_confirmada))
-                prestamo_activo = cursor.fetchone()
-                
-                if not prestamo_activo:
-                    estado = 'error_db'  # El usuario no coincide con el préstamo de ese libro
+
+            # =========================
+            # PASO 2: DEVOLVER LIBROS
+            # =========================
+            elif accion == 'devolver':
+
+                libros_ids = request.form.getlist('libros')
+
+                if not matricula or len(libros_ids) == 0:
+                    estado = 'error'
+
                 else:
                     try:
-                        # Incrementar el stock disponible en la tabla de "libros"
-                        nueva_cantidad = libro['disponibles'] + 1
-                        query_actualizar = "UPDATE libros SET disponibles = %s WHERE id_libro = %s"
-                        cursor.execute(query_actualizar, (nueva_cantidad, libro['id_libro']))
-                        
-                        # Registrar el movimiento en la tabla de "devolucion"
-                        query_insertar_devolucion = "INSERT INTO devolucion (matricula, titulo_libro, nombre_prestamista) VALUES (%s, %s, %s)"
-                        cursor.execute(query_insertar_devolucion, (matricula_confirmada, titulo_ingresado, nombre_prestamista))
-                        
-                        # Eliminar al usuario de la tabla "prestamo"
-                        query_eliminar_prestamo = "DELETE FROM prestamo WHERE id_prestamo = %s"
-                        cursor.execute(query_eliminar_prestamo, (prestamo_activo['id_prestamo'],))
-                        
-                        # Confirmar todas las operaciones realizadas
-                        conexion.commit() 
-                        estado = 'devolucion_con_exito'
+
+                        for libro_id in libros_ids:
+
+                            cursor.execute("""
+                                SELECT id_prestamo, titulo_libro
+                                FROM prestamo
+                                WHERE id_prestamo = %s AND matricula = %s
+                            """, (libro_id, matricula))
+
+                            prestamo = cursor.fetchone()
+
+                            if prestamo:
+
+                                titulo = prestamo['titulo_libro']
+
+                                cursor.execute("""
+                                    UPDATE libros
+                                    SET disponibles = disponibles + 1
+                                    WHERE titulo = %s
+                                """, (titulo,))
+
+                                cursor.execute("""
+                                    INSERT INTO devolucion
+                                    (matricula, titulo_libro, nombre_prestamista)
+                                    VALUES (%s, %s, %s)
+                                """, (
+                                    matricula,
+                                    titulo,
+                                    matricula
+                                ))
+
+                                cursor.execute("""
+                                    DELETE FROM prestamo
+                                    WHERE id_prestamo = %s
+                                """, (libro_id,))
+
+                                libros_devueltos.append(titulo)
+
+                            else:
+                                libros_invalidos.append(libro_id)
+
+                        conexion.commit()
+                        estado = 'devolucion_ok'
+
                     except mysql.connector.Error as err:
-                        print(f"Error en la transacción de devolución: {err}")
-                        conexion.rollback() # Cancela la devolucion si algo falla
+                        print("ERROR:", err)
+                        conexion.rollback()
                         estado = 'error_db'
-            else:
-                estado = 'completo'
-                
-        # Cerrar flujos abiertos        
-        cursor.close()
-        conexion.close()
-        
-    return render_template('Devoluciones.html', estado=estado, titulo_buscado=titulo_buscado, matricula_buscada=matricula_buscada, nombre_estudiante=nombre_estudiante)
 
+    cursor.close()
+    conexion.close()
 
+    return render_template(
+        "Devoluciones.html",
+        estado=estado,
+        matricula=matricula,
+        libros_usuario=libros_usuario,
+        libros_devueltos=libros_devueltos,
+        libros_invalidos=libros_invalidos
+    )
 # -- MÓDULOS EXCLUSIVOS DEL ADMINISTRADOR --
 
 # MODULO PARA HISTORIAL
